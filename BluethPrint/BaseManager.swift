@@ -188,223 +188,6 @@ class Printer
 
     let enc = CFStringConvertEncodingToNSStringEncoding(UInt32(CFStringEncodings.GB_18030_2000.rawValue))
 
-
-    var maxLine = 0
-    /**
-     * 打印四列 自动换行
-     * max 最大4字
-     * @param leftText   左侧文字
-     * @param middleLeftText 中间左文字
-     * @param middleRIghtText 中间右文字
-     * @param rightText  右侧文字
-     * @return
-     */
-    func printFourDataAutoLine(leftText: String, middleLeftText: String, middleRIghtText: String, rightText: String) ->[Data]{
-        // 存放打印的数据（data）
-        var printerAllDataArr: [Data] = []
-        // 每一列可显示汉子的个数
-        let maxTextCount = LINE_BYTE_SIZE/4
-        maxLine = 0
-        let leftStrArr = printStrArrWithText(text: leftText, maxTextCount: maxTextCount)
-        var middleLeftStrArr = printStrArrWithText(text: middleLeftText, maxTextCount: maxTextCount)
-        var middleRightStrArr = printStrArrWithText(text: middleRIghtText, maxTextCount: maxTextCount)
-        var rightStrArr = printStrArrWithText(text: rightText, maxTextCount: maxTextCount)
-        for i in 0..<maxLine {
-            let data = printFourData(leftText: leftStrArr[i], middleLeftText: middleLeftStrArr[i], middleRIghtText: middleRightStrArr[i], rightText: rightStrArr[i])
-            printerAllDataArr.append(data)
-        }
-        return printerAllDataArr
-    }
-
-    // 字符串根据一行最大值maxTextCount分成数组
-    func printStrArrWithText(text: String,maxTextCount: Int) -> [String] {
-        let enc = CFStringConvertEncodingToNSStringEncoding(UInt32(CFStringEncodings.GB_18030_2000.rawValue))
-
-        var textArr:[String] = []
-        let textData = setTitle(text: text) as NSData
-        let textLength = textData.length
-        if textLength > maxTextCount {
-            // 需要几行
-            let lines = textLength / maxTextCount
-            // 余数
-            let remainder = textLength % maxTextCount
-            // 设置最大支持7行
-            for i in 0..<lines {
-                let temp = textData.subdata(with: NSMakeRange(i*maxTextCount, maxTextCount))
-                let str = String(data: temp, encoding: String.Encoding(rawValue: enc))
-                if str == nil {
-                    let temp = textData.subdata(with: NSMakeRange(i*(maxTextCount-1), maxTextCount))
-                    let str = String(data: temp, encoding: String.Encoding(rawValue: enc))
-                    if str != nil {
-                        textArr.append(str!)
-                    }
-                }else {
-                    textArr.append(str!)
-                }
-            }
-            // 记录的值 小于当先行书 并且 有余数 就lines+1 否则 记录lines
-            if maxLine < lines && remainder != 0{
-                maxLine = lines + 1
-            }else if maxLine < lines && remainder == 0{
-                maxLine = lines
-            }
-            if remainder != 0 {
-                let temp = textData.subdata(with: NSMakeRange(lines*maxTextCount, remainder))
-                let str = String(data: temp, encoding: String.Encoding(rawValue: enc))
-                textArr.append(str!)
-            }
-        }else { // 文本没有超过限制
-            if maxLine == 0 {
-                maxLine = 1
-            }
-            textArr.append(text)
-        }
-        if textArr.count < 5 { // 最多支持5
-            for _ in 0..<5-textArr.count {
-                textArr.append("")
-            }
-        }
-        return textArr
-    }
-
-    //  两列 右侧文本自动换行 maxChar 个汉子
-    func setRightTextAutoLine(left: String,right: String,maxText:Int)->Data {
-
-        // 存放打印的数据（data）
-        let printerData: NSMutableData = NSMutableData.init()
-
-        let valueCount = right.count
-        if valueCount > maxText {
-            // 需要几行
-            let lines = valueCount / maxText
-            // 余数
-            let remainder = valueCount % maxText
-            for i in 0..<lines {
-                let index1 = right.index(right.startIndex, offsetBy: i*maxText)
-                let index2 = right.index(right.startIndex, offsetBy: i*maxText + maxText)
-                let sub1 = right[index1..<index2]
-                print(sub1)
-                if i == 0 {
-                    let tempData = printTwoData(leftText: left, rightText: String(sub1))
-                    printerData.append(tempData)
-                }else {
-                    let tempData = printTwoData(leftText: "", rightText: String(sub1))
-                    printerData.append(tempData)
-                }
-            }
-            if remainder != 0 {
-                let index1 = right.index(right.startIndex, offsetBy: lines*maxText)
-                let index2 = right.index(right.startIndex, offsetBy: lines*maxText + remainder)
-                let sub1 = right[index1..<index2]
-                print(sub1)
-                let tempData = printTwoData(leftText: "", rightText: String(sub1))
-                printerData.append(tempData)
-            }
-        }else {
-            let tempData = printTwoData(leftText: left, rightText: right)
-            printerData.append(tempData)
-        }
-
-        let lineData = nextLine(number: 1)
-        printerData.append(lineData)
-        return printerData as Data
-    }
-
-
-    //   text 内容。value 右侧内容 左侧列 支持的最大显示 超过四字自动换行
-    //  两列 左侧文本自动换行
-    func setLeftTextLine(text: String,value: String,maxChar:Int)->Data {
-        let data = text.data(using: String.Encoding(rawValue: enc))! as NSData
-
-        if (data.length > maxChar) {
-            let lines = data.length / maxChar
-            let remainder = data.length % maxChar
-            var tempData: NSMutableData = NSMutableData.init()
-            for i in 0..<lines {
-                let temp = (data.subdata(with: NSMakeRange(i*maxChar, maxChar)) as NSData)
-                tempData.append(temp.bytes, length: temp.length)
-                if i == 0 {
-                    let data = setOffsetText(value: value)
-                    tempData.append(data.bytes, length: data.length)
-                }
-                let line = nextLine(number: 1) as NSData
-                tempData.append(line.bytes, length: line.length)
-            }
-            if remainder != 0 { // 余数不0
-                let temp = data.subdata(with: NSMakeRange(lines*maxChar, remainder)) as NSData
-                tempData.append(temp.bytes, length: temp.length)
-            }
-            return tempData as Data
-        }
-        let rightTextData = setOffsetText(value: value)
-        let mutData = NSMutableData.init(data: data as Data)
-        mutData.append(rightTextData.bytes, length: rightTextData.length)
-        return mutData as Data
-    }
-
-    // 添加文字，不换行
-    func setTitle(text: String) -> Data {
-        let enc = CFStringConvertEncodingToNSStringEncoding(UInt32(CFStringEncodings.GB_18030_2000.rawValue))
-        ///这里一定要GB_18030_2000，测试过用utf-系列是乱码，踩坑了。
-        let data = text.data(using: String.Encoding(rawValue: enc), allowLossyConversion: false)
-        if data != nil{
-            return data!
-        }
-        return Data()
-    }
-    /**
-     *  设置偏移文字
-     *
-     *  @param value 右侧内容
-     */
-    func setOffsetText(value: String) -> NSData {
-        let attributes = [NSAttributedString.Key.font:UIFont.systemFont(ofSize: 22.0)] //设置字体大小
-        let option = NSStringDrawingOptions.usesLineFragmentOrigin
-        //获取字符串的frame
-        let rect:CGRect = value.boundingRect(with: CGSize.init(width: 320.0, height: 999.9), options: option, attributes: attributes, context: nil)
-        let valueWidth: Int = Int(rect.size.width)
-        let preNum = (UserDefaults.standard.value(forKey: "printerNum") ?? 0) as! Int
-        let offset = (preNum == 0 ? 384 : 576) - valueWidth - 30
-        let remainder = offset % 256
-        let consult = offset / 256;
-        var foo:[UInt8] = [0x1B, 0x24]
-        foo.append(UInt8(remainder))
-        foo.append(UInt8(consult))
-        let data = Data.init(bytes: foo) as NSData
-        let mutData = NSMutableData.init()
-        mutData.append(data.bytes, length: data.length)
-        let titleData = setTitle(text: value) as NSData
-        mutData.append(titleData.bytes, length: titleData.length)
-        return mutData as NSData
-    }
-    //    添加横线 默认32位
-    func addImaginaryLine() -> Data {
-        let preNum = (UserDefaults.standard.value(forKey: "printerNum") ?? 0) as! Int
-        let paperWidth = (preNum == 0 ? 384 : 576)
-        var number: Int = 0
-        if paperWidth == 384 {
-            number = 32
-        }else {
-            number = 48
-        }
-        var foo:[UInt8] = []
-        for _ in 0..<number {
-            foo.append(45)
-        }
-        foo.append(LF)
-        return Data.init(bytes:foo)
-    }
-
-    // FS S n1 n2 设置汉字字符左右间距 0<= 255
-    func setHanZiEdge() ->Data {
-        var foo:[UInt8] = []
-        foo.append(28)// 固定
-        foo.append(83)// 固定
-        foo.append(10)// 左间距
-        foo.append(0) // 右间距
-        return Data.init(bytes: foo)
-    }
-
     /**
      * 打印纸一行最大的字节 32 / 46
      */
@@ -421,113 +204,6 @@ class Printer
      * 打印三列时，第一列汉字最多显示几个文字
      */
     let LEFT_TEXT_MAX_LENGTH = 5;
-
-    // 打印两列
-    func printTwoData(leftText: String, rightText: String) ->Data {
-        var strText = ""
-        let leftTextLength = (setTitle(text: leftText) as NSData).length
-        let rightTextLength = (setTitle(text: rightText)  as NSData).length
-        strText = strText + leftText
-
-        // 计算文字中间的空格
-        let marginBetweenMiddleAndRight = LINE_BYTE_SIZE - leftTextLength - rightTextLength;
-        for _ in 0..<marginBetweenMiddleAndRight {
-            strText = strText + " "
-        }
-        strText = strText + rightText
-
-
-        let data = NSMutableData()
-        let lineData = nextLine(number: 1)
-        data.append(setTitle(text: strText))
-        data.append(lineData)
-        return data as Data
-    }
-
-    /**
-     * 打印三列
-     *
-     * @param leftText   左侧文字
-     * @param middleText 中间文字
-     * @param rightText  右侧文字
-     * @return
-     */
-    func printThreeData(leftText: String, middleText: String, rightText: String) ->String{
-        var strText = ""
-
-        let leftTextLength = (setTitle(text: leftText) as NSData).length
-        let middleTextLength = (setTitle(text: middleText)  as NSData).length
-        let rightTextLength = (setTitle(text: rightText)  as NSData).length
-
-        strText = strText + leftText
-
-        // 计算左侧文字和中间文字的空格长度
-        let marginBetweenLeftAndMiddle = LEFT_LENGTH - leftTextLength - middleTextLength / 2;
-        for _ in 0..<marginBetweenLeftAndMiddle {
-            strText = strText + " "
-        }
-        strText = strText + middleText
-
-        // 计算右侧文字和中间文字的空格长度
-        let marginBetweenMiddleAndRight = RIGHT_LENGTH - middleTextLength / 2 - rightTextLength;
-
-        for _ in 0..<(marginBetweenMiddleAndRight) {
-            strText = strText + " "
-        }
-        strText = strText + rightText
-        return strText
-    }
-
-    /**
-     * 打印四列
-     *
-     * @param leftText   左侧文字
-     * @param middleLeftText 中间左文字
-     * @param middleRIghtText 中间右文字
-     * @param rightText  右侧文字
-     * @return
-     */
-    func printFourData(leftText: String, middleLeftText: String, middleRIghtText: String, rightText: String) ->Data{
-        var strText = ""
-        let width = LINE_BYTE_SIZE/4
-        let leftTextLength = (setTitle(text: leftText) as NSData).length
-        let middleLeftTextLength = (setTitle(text: middleLeftText) as NSData).length
-        let middleRIghtTextLength = (setTitle(text: middleRIghtText) as NSData).length
-        let rightTextLength = (setTitle(text: rightText) as NSData).length
-
-        strText = strText + leftText
-
-        // 计算左侧文字和左1文字的空格长度
-        let marginLeftAndLeftMiddle = width - leftTextLength + (width/2 - middleLeftTextLength/2);
-        for _ in 0..<marginLeftAndLeftMiddle {
-            strText = strText + " "
-        }
-        strText = strText + middleLeftText
-
-        // 计算左侧文字和中间文字的空格长度
-        let marginBetweenLeftAndMiddle = width - middleLeftTextLength/2 - middleRIghtTextLength/2;
-        for _ in 0..<marginBetweenLeftAndMiddle {
-            strText = strText + " "
-        }
-        strText = strText + middleRIghtText
-
-        // 计算左侧文字和中间文字的空格长度
-        let marginBetweenRightAndMiddle = width - rightTextLength + (width/2-middleRIghtTextLength/2);
-        for i in 0..<marginBetweenRightAndMiddle {
-            if i == marginBetweenRightAndMiddle - 1 {
-
-            }else {
-                strText = strText + " "
-            }
-        }
-        strText = strText + rightText
-        let data = NSMutableData()
-        let lineData = nextLine(number: 1)
-        data.append(setTitle(text: strText))
-        data.append(lineData)
-        return data as Data
-    }
-    /*------------------------------------------------------------------------------------------------*/
 
     ///初始化打印机
     func clear() -> Data {
@@ -673,6 +349,320 @@ class Printer
     func mergerPaper() -> Data {
         return Data.init(bytes:[ESC,109])
     }
+
+    // 添加文字，不换行
+    func setTitle(text: String) -> Data {
+        let enc = CFStringConvertEncodingToNSStringEncoding(UInt32(CFStringEncodings.GB_18030_2000.rawValue))
+        ///这里一定要GB_18030_2000，测试过用utf-系列是乱码，踩坑了。
+        let data = text.data(using: String.Encoding(rawValue: enc), allowLossyConversion: false)
+        if data != nil{
+            return data!
+        }
+        return Data()
+    }
+
+    //  两列 右侧文本自动换行 maxChar 个字符
+    func setRightTextAutoLine(left: String,right: String,maxText:Int)->Data {
+
+        // 存放打印的数据（data）
+        let printerData: NSMutableData = NSMutableData.init()
+
+        let valueCount = right.count
+        if valueCount > maxText {
+            // 需要几行
+            let lines = valueCount / maxText
+            // 余数
+            let remainder = valueCount % maxText
+            for i in 0..<lines {
+                let index1 = right.index(right.startIndex, offsetBy: i*maxText)
+                let index2 = right.index(right.startIndex, offsetBy: i*maxText + maxText)
+                let sub1 = right[index1..<index2]
+                print(sub1)
+                if i == 0 {
+                    let tempData = printTwoData(leftText: left, rightText: String(sub1))
+                    printerData.append(tempData)
+                }else {
+                    let tempData = printTwoData(leftText: "", rightText: String(sub1))
+                    printerData.append(tempData)
+                }
+            }
+            if remainder != 0 {
+                let index1 = right.index(right.startIndex, offsetBy: lines*maxText)
+                let index2 = right.index(right.startIndex, offsetBy: lines*maxText + remainder)
+                let sub1 = right[index1..<index2]
+                print(sub1)
+                let tempData = printTwoData(leftText: "", rightText: String(sub1))
+                printerData.append(tempData)
+            }
+        }else {
+            let tempData = printTwoData(leftText: left, rightText: right)
+            printerData.append(tempData)
+        }
+
+        let lineData = nextLine(number: 1)
+        printerData.append(lineData)
+        return printerData as Data
+    }
+
+    //   text 内容。value 右侧内容 左侧列 支持的最大显示 超过四字自动换行
+    //  两列 左侧文本自动换行
+    func setLeftTextLine(text: String,value: String,maxChar:Int)->Data {
+        let data = text.data(using: String.Encoding(rawValue: enc))! as NSData
+
+        if (data.length > maxChar) {
+            let lines = data.length / maxChar
+            let remainder = data.length % maxChar
+            var tempData: NSMutableData = NSMutableData.init()
+            for i in 0..<lines {
+                let temp = (data.subdata(with: NSMakeRange(i*maxChar, maxChar)) as NSData)
+                tempData.append(temp.bytes, length: temp.length)
+                if i == 0 {
+                    let data = setOffsetText(value: value)
+                    tempData.append(data.bytes, length: data.length)
+                }
+                let line = nextLine(number: 1) as NSData
+                tempData.append(line.bytes, length: line.length)
+            }
+            if remainder != 0 { // 余数不0
+                let temp = data.subdata(with: NSMakeRange(lines*maxChar, remainder)) as NSData
+                tempData.append(temp.bytes, length: temp.length)
+            }
+            return tempData as Data
+        }
+        let rightTextData = setOffsetText(value: value)
+        let mutData = NSMutableData.init(data: data as Data)
+        mutData.append(rightTextData.bytes, length: rightTextData.length)
+        return mutData as Data
+    }
+
+    /**
+     *  设置偏移文字
+     *
+     *  @param value 右侧内容
+     */
+    func setOffsetText(value: String) -> NSData {
+        let attributes = [NSAttributedString.Key.font:UIFont.systemFont(ofSize: 22.0)] //设置字体大小
+        let option = NSStringDrawingOptions.usesLineFragmentOrigin
+        //获取字符串的frame
+        let rect:CGRect = value.boundingRect(with: CGSize.init(width: 320.0, height: 999.9), options: option, attributes: attributes, context: nil)
+        let valueWidth: Int = Int(rect.size.width)
+        let preNum = (UserDefaults.standard.value(forKey: "printerNum") ?? 0) as! Int
+        let offset = (preNum == 0 ? 384 : 576) - valueWidth - 30
+        let remainder = offset % 256
+        let consult = offset / 256;
+        var foo:[UInt8] = [0x1B, 0x24]
+        foo.append(UInt8(remainder))
+        foo.append(UInt8(consult))
+        let data = Data.init(bytes: foo) as NSData
+        let mutData = NSMutableData.init()
+        mutData.append(data.bytes, length: data.length)
+        let titleData = setTitle(text: value) as NSData
+        mutData.append(titleData.bytes, length: titleData.length)
+        return mutData as NSData
+    }
+    //    添加横线 默认32位
+    func addImaginaryLine() -> Data {
+        let preNum = (UserDefaults.standard.value(forKey: "printerNum") ?? 0) as! Int
+        let paperWidth = (preNum == 0 ? 384 : 576)
+        var number: Int = 0
+        if paperWidth == 384 {
+            number = 32
+        }else {
+            number = 48
+        }
+        var foo:[UInt8] = []
+        for _ in 0..<number {
+            foo.append(45)
+        }
+        foo.append(LF)
+        return Data.init(bytes:foo)
+    }
+    // 打印两列
+    func printTwoData(leftText: String, rightText: String) ->Data {
+        var strText = ""
+        let leftTextLength = (setTitle(text: leftText) as NSData).length
+        let rightTextLength = (setTitle(text: rightText)  as NSData).length
+        strText = strText + leftText
+
+        // 计算文字中间的空格
+        let marginBetweenMiddleAndRight = LINE_BYTE_SIZE - leftTextLength - rightTextLength;
+        for _ in 0..<marginBetweenMiddleAndRight {
+            strText = strText + " "
+        }
+        strText = strText + rightText
+
+
+        let data = NSMutableData()
+        let lineData = nextLine(number: 1)
+        data.append(setTitle(text: strText))
+        data.append(lineData)
+        return data as Data
+    }
+
+    /**
+     * 打印三列
+     *
+     * @param leftText   左侧文字
+     * @param middleText 中间文字
+     * @param rightText  右侧文字
+     * @return
+     */
+    func printThreeData(leftText: String, middleText: String, rightText: String) ->String{
+        var strText = ""
+
+        let leftTextLength = (setTitle(text: leftText) as NSData).length
+        let middleTextLength = (setTitle(text: middleText)  as NSData).length
+        let rightTextLength = (setTitle(text: rightText)  as NSData).length
+
+        strText = strText + leftText
+
+        // 计算左侧文字和中间文字的空格长度
+        let marginBetweenLeftAndMiddle = LEFT_LENGTH - leftTextLength - middleTextLength / 2;
+        for _ in 0..<marginBetweenLeftAndMiddle {
+            strText = strText + " "
+        }
+        strText = strText + middleText
+
+        // 计算右侧文字和中间文字的空格长度
+        let marginBetweenMiddleAndRight = RIGHT_LENGTH - middleTextLength / 2 - rightTextLength;
+
+        for _ in 0..<(marginBetweenMiddleAndRight) {
+            strText = strText + " "
+        }
+        strText = strText + rightText
+        return strText
+    }
+
+    /**
+     * 打印四列
+     *
+     * @param leftText   左侧文字
+     * @param middleLeftText 中间左文字
+     * @param middleRIghtText 中间右文字
+     * @param rightText  右侧文字
+     * @return
+     */
+    func printFourData(leftText: String, middleLeftText: String, middleRIghtText: String, rightText: String) ->Data{
+        var strText = ""
+        let width = LINE_BYTE_SIZE/4
+        let leftTextLength = (setTitle(text: leftText) as NSData).length
+        let middleLeftTextLength = (setTitle(text: middleLeftText) as NSData).length
+        let middleRIghtTextLength = (setTitle(text: middleRIghtText) as NSData).length
+        let rightTextLength = (setTitle(text: rightText) as NSData).length
+
+        strText = strText + leftText
+
+        // 计算左侧文字和左1文字的空格长度
+        let marginLeftAndLeftMiddle = width - leftTextLength + (width/2 - middleLeftTextLength/2);
+        for _ in 0..<marginLeftAndLeftMiddle {
+            strText = strText + " "
+        }
+        strText = strText + middleLeftText
+
+        // 计算左侧文字和中间文字的空格长度
+        let marginBetweenLeftAndMiddle = width - middleLeftTextLength/2 - middleRIghtTextLength/2;
+        for _ in 0..<marginBetweenLeftAndMiddle {
+            strText = strText + " "
+        }
+        strText = strText + middleRIghtText
+
+        // 计算左侧文字和中间文字的空格长度
+        let marginBetweenRightAndMiddle = width - rightTextLength + (width/2-middleRIghtTextLength/2);
+        for i in 0..<marginBetweenRightAndMiddle {
+            if i == marginBetweenRightAndMiddle - 1 {
+
+            }else {
+                strText = strText + " "
+            }
+        }
+        strText = strText + rightText
+        let data = NSMutableData()
+        let lineData = nextLine(number: 1)
+        data.append(setTitle(text: strText))
+        data.append(lineData)
+        return data as Data
+    }
+
+    /**
+     * 打印四列 自动换行
+     * max 最大4字
+     * @param leftText   左侧文字
+     * @param middleLeftText 中间左文字
+     * @param middleRIghtText 中间右文字
+     * @param rightText  右侧文字
+     * @return
+     */
+    var maxLine = 0
+    func printFourDataAutoLine(leftText: String, middleLeftText: String, middleRIghtText: String, rightText: String) ->[Data]{
+        // 存放打印的数据（data）
+        var printerAllDataArr: [Data] = []
+        // 每一列可显示汉子的个数
+        let maxTextCount = LINE_BYTE_SIZE/4
+        maxLine = 0
+        let leftStrArr = printStrArrWithText(text: leftText, maxTextCount: maxTextCount)
+        var middleLeftStrArr = printStrArrWithText(text: middleLeftText, maxTextCount: maxTextCount)
+        var middleRightStrArr = printStrArrWithText(text: middleRIghtText, maxTextCount: maxTextCount)
+        var rightStrArr = printStrArrWithText(text: rightText, maxTextCount: maxTextCount)
+        for i in 0..<maxLine {
+            let data = printFourData(leftText: leftStrArr[i], middleLeftText: middleLeftStrArr[i], middleRIghtText: middleRightStrArr[i], rightText: rightStrArr[i])
+            printerAllDataArr.append(data)
+        }
+        return printerAllDataArr
+    }
+
+    // 字符串根据一行最大值maxTextCount分成数组
+    func printStrArrWithText(text: String,maxTextCount: Int) -> [String] {
+        let enc = CFStringConvertEncodingToNSStringEncoding(UInt32(CFStringEncodings.GB_18030_2000.rawValue))
+
+        var textArr:[String] = []
+        let textData = setTitle(text: text) as NSData
+        let textLength = textData.length
+        if textLength > maxTextCount {
+            // 需要几行
+            let lines = textLength / maxTextCount
+            // 余数
+            let remainder = textLength % maxTextCount
+            // 设置最大支持7行
+            for i in 0..<lines {
+                let temp = textData.subdata(with: NSMakeRange(i*maxTextCount, maxTextCount))
+                let str = String(data: temp, encoding: String.Encoding(rawValue: enc))
+                if str == nil {
+                    let temp = textData.subdata(with: NSMakeRange(i*(maxTextCount-1), maxTextCount))
+                    let str = String(data: temp, encoding: String.Encoding(rawValue: enc))
+                    if str != nil {
+                        textArr.append(str!)
+                    }
+                }else {
+                    textArr.append(str!)
+                }
+            }
+            // 记录的值 小于当先行书 并且 有余数 就lines+1 否则 记录lines
+            if maxLine < lines && remainder != 0{
+                maxLine = lines + 1
+            }else if maxLine < lines && remainder == 0{
+                maxLine = lines
+            }
+            if remainder != 0 {
+                let temp = textData.subdata(with: NSMakeRange(lines*maxTextCount, remainder))
+                let str = String(data: temp, encoding: String.Encoding(rawValue: enc))
+                textArr.append(str!)
+            }
+        }else { // 文本没有超过限制
+            if maxLine == 0 {
+                maxLine = 1
+            }
+            textArr.append(text)
+        }
+        if textArr.count < 5 { // 最多支持5
+            for _ in 0..<5-textArr.count {
+                textArr.append("")
+            }
+        }
+        return textArr
+    }
+
+
+    /*------------------------------------------------------------------------------------------------*/
 }
 
 
